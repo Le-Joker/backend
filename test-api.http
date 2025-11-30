@@ -1,0 +1,156 @@
+### Variables
+@baseUrl = http://localhost:3001/api
+@token = YOUR_TOKEN_HERE
+@userId = YOUR_USER_ID_HERE
+
+### ========================================
+### AUTHENTIFICATION
+### ========================================
+
+### 1. INSCRIPTION - Créer un utilisateur ETUDIANT
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "etudiant@test.com",
+  "password": "password123",
+  "nom": "Dupont",
+  "prenom": "Marie",
+  "telephone": "0612345678",
+  "role": "ETUDIANT"
+}
+
+### 2. INSCRIPTION - Créer un utilisateur FORMATEUR
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "formateur@test.com",
+  "password": "password123",
+  "nom": "Martin",
+  "prenom": "Jean",
+  "telephone": "0612345679",
+  "role": "FORMATEUR"
+}
+
+### 3. INSCRIPTION - Créer un utilisateur CLIENT
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "client@test.com",
+  "password": "password123",
+  "nom": "Bernard",
+  "prenom": "Sophie",
+  "telephone": "0612345680",
+  "role": "CLIENT"
+}
+
+### 4. CONNEXION - Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "etudiant@test.com",
+  "password": "password123"
+}
+
+### 5. PROFIL - Récupérer les infos de l'utilisateur connecté
+### ⚠️ Remplacez YOUR_TOKEN_HERE par le token reçu lors du login
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### 6. TEST ERREUR - Email déjà existant
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "etudiant@test.com",
+  "password": "password123",
+  "nom": "Test",
+  "prenom": "Double"
+}
+
+### 7. TEST ERREUR - Mauvais mot de passe
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "etudiant@test.com",
+  "password": "mauvais_password"
+}
+
+### ========================================
+### MODULE USERS
+### ========================================
+
+### 8. LISTE UTILISATEURS - Admin uniquement
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
+
+### 9. RÉCUPÉRER UN UTILISATEUR
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+### 10. METTRE À JOUR SON PROFIL
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nom": "Dupont",
+  "prenom": "Marie-Claire",
+  "telephone": "0612345999"
+}
+
+### 11. SUPPRIMER UN UTILISATEUR - Admin uniquement
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+### ========================================
+### TEST FORMATEUR
+### ========================================
+
+### 12. RÉCUPÉRER LES QUESTIONS DU TEST
+GET {{baseUrl}}/users/test-formateur/questions
+Authorization: Bearer {{token}}
+
+### 13. SOUMETTRE LE TEST - Réponses correctes (score ≥ 70%)
+POST {{baseUrl}}/users/test-formateur/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reponses": [
+    { "questionId": 1, "reponse": 1 },
+    { "questionId": 2, "reponse": 1 },
+    { "questionId": 3, "reponse": "Je commencerais par enseigner les bases théoriques de la maçonnerie, puis je passerais à des exercices pratiques supervisés. Enfin, je laisserais les apprenants réaliser un petit projet en autonomie avec un accompagnement." },
+    { "questionId": 4, "reponse": 1 },
+    { "questionId": 5, "reponse": 2 },
+    { "questionId": 6, "reponse": [0, 1, 2, 4] },
+    { "questionId": 7, "reponse": 1 },
+    { "questionId": 8, "reponse": "Sur un chantier, un conflit est survenu entre deux membres de l'équipe concernant la méthode de travail. J'ai organisé une réunion, écouté les deux points de vue, et nous avons trouvé ensemble une solution qui respectait les normes de sécurité tout en optimisant le temps de travail." }
+  ]
+}
+
+### 14. SOUMETTRE LE TEST - Réponses incorrectes (score < 70%)
+POST {{baseUrl}}/users/test-formateur/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reponses": [
+    { "questionId": 1, "reponse": 0 },
+    { "questionId": 2, "reponse": 0 },
+    { "questionId": 3, "reponse": "Je ne sais pas." },
+    { "questionId": 4, "reponse": 0 },
+    { "questionId": 5, "reponse": 0 },
+    { "questionId": 6, "reponse": [3] },
+    { "questionId": 7, "reponse": 0 },
+    { "questionId": 8, "reponse": "Aucune." }
+  ]
+}
+
+### 15. RÉCUPÉRER LE RÉSULTAT DU TEST
+GET {{baseUrl}}/users/test-formateur/result
+Authorization: Bearer {{token}}
