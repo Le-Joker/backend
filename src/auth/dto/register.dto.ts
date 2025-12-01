@@ -1,25 +1,21 @@
 import { IsEmail, IsString, MinLength, IsEnum, IsOptional } from 'class-validator';
-import { Role } from '../../entities/user.entity';
+import { UserRole } from '../../users/entities/user.entity';
 
 export class RegisterDto {
-  @IsEmail()
+  @IsEmail({}, { message: 'Email invalide' })
   email: string;
 
-  @IsString()
+  @IsString({ message: 'Le mot de passe doit être une chaîne' })
   @MinLength(6, { message: 'Le mot de passe doit contenir au moins 6 caractères' })
   password: string;
 
-  @IsString()
-  nom: string;
+  @IsString({ message: 'Le prénom doit être une chaîne' })
+  firstName: string;
 
-  @IsString()
-  prenom: string;
+  @IsString({ message: 'Le nom doit être une chaîne' })
+  lastName: string;
 
   @IsOptional()
-  @IsString()
-  telephone?: string;
-
-  @IsEnum(Role)
-  @IsOptional()
-  role?: Role; // Par défaut ETUDIANT
+  @IsEnum(UserRole, { message: 'Rôle invalide' })
+  role?: UserRole;
 }

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Inscription } from '../entities/inscription.entity';
 import { User } from '../entities/user.entity';
 import { Formation } from '../entities/formation.entity';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 import * as path from 'path';
 

@@ -4,75 +4,77 @@ import {
   Body,
   Get,
   UseGuards,
-  ValidationPipe,
   Req,
   Res,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { User } from '../entities/user.entity';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
+import { User } from '../users/entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
-import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-    private configService: ConfigService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
-  // ========================================
-  // POST /auth/register
-  // ========================================
+  // ==============================
+  // 🔒 REGISTER - Rate limit strict
+  // ==============================
   @Post('register')
-  async register(@Body(ValidationPipe) registerDto: RegisterDto) {
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 tentatives par minute
+  async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
-  // ========================================
-  // POST /auth/login
-  // ========================================
+  // ==============================
+  // 🔒 LOGIN - Rate limit strict
+  // ==============================
   @Post('login')
-  async login(@Body(ValidationPipe) loginDto: LoginDto) {
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 tentatives par minute
+  async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
 
-  // ========================================
-  // GET /auth/me (route protégée)
-  // ========================================
+  // ==============================
+  // GET CURRENT USER
+  // ==============================
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getProfile(@CurrentUser() user: User) {
-    const { password, ...result } = user;
-    return result;
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      avatar: user.avatar,
+      testPassed: user.testPassed,
+      testScore: user.testScore,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
   }
 
-  // ========================================
+  // ==============================
   // GOOGLE OAUTH
-  // ========================================
-
-  // GET /auth/google - Démarre le flux OAuth
+  // ==============================
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
-    // Redirige automatiquement vers Google
+    // Redirige vers Google
   }
 
-  // GET /auth/google/callback - Callback après OAuth
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@Req() req, @Res() res: Response) {
-    const user = req.user as User;
-
-    // Générer le token JWT
-    const token = this.authService.generateTokenForUser(user);
-
-    // Rediriger vers le frontend avec le token
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+  async googleAuthCallback(@Req() req, @Res() res: Response) {
+    const { access_token, user } = await this.authService.googleLogin(req.user);
+    
+    // Redirection vers frontend avec token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback?token=${access_token}`);
   }
 }

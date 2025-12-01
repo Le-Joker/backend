@@ -1,82 +1,85 @@
-// src/app.module.ts - VERSION CORRIGÉE
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
-// ✅ Entités
-import { User } from './entities/user.entity';
-import { TestFormateur } from './entities/test-formateur.entity';
-import { Chantier } from './entities/chantier.entity';
-import { ChantierUpdate } from './entities/chantier-update.entity';
-import { Devis } from './entities/devis.entity';
-import { Formation } from './entities/formation.entity';
-import { Module as ModuleEntity } from './entities/module.entity';
-import { Lesson } from './entities/lesson.entity';
-import { Testimonial } from './entities/testimonial.entity';
-import { Statistics } from './entities/statistics.entity';
-import { Notification } from './entities/notification.entity';
-import { File } from './entities/file.entity';
-
-// ✅ Modules fonctionnels
+// Vos modules existants
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { FormationsModule } from './formations/formations.module'; // ⚠️ À AJOUTER
-import { DevisModule } from './devis/devis.module'; // ✅ CRÉÉ
-import { ChantiersModule } from './chantiers/chantiers.module'; // ✅ CRÉÉ
-import { PublicModule } from './public/public.module';
-import { ChatModule } from './chat/chat.module';
+import { FormationsModule } from './formations/formations.module';
 import { InscriptionsModule } from './inscriptions/inscriptions.module';
-import { CertificatesModule } from './certificates/certificates.module';
+import { DevisModule } from './devis/devis.module';
+import { ChantiersModule } from './chantiers/chantiers.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChatModule } from './chat/chat.module';
+import { CertificatesModule } from './certificates/certificates.module';
+import { UploadModule } from './upload/upload.module';
+import { PublicModule } from './public/public.module';
 
 @Module({
   imports: [
+    // ==============================
     // Configuration
+    // ==============================
     ConfigModule.forRoot({
       isGlobal: true,
     }),
 
+    // ==============================
+    // 🔒 RATE LIMITING GLOBAL
+    // ==============================
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000, // 60 secondes
+        limit: 100, // 100 requêtes max par minute
+      },
+      {
+        name: 'strict',
+        ttl: 60000,
+        limit: 10, // Pour login/register
+      },
+    ]),
+
+    // ==============================
     // Base de données
+    // ==============================
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
+      port: parseInt(process.env.DB_PORT || '5432'),
       username: process.env.DB_USERNAME || 'postgres',
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'intellect_building',
-      entities: [
-        User,
-        TestFormateur,
-        Chantier,
-        ChantierUpdate,
-        Devis,
-        Formation,
-        ModuleEntity,
-        Lesson,
-        Testimonial,
-        Statistics,
-        Notification,
-        File,
-      ],
-      synchronize: true, // ⚠️ false en production
-      logging: false,
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      synchronize: process.env.NODE_ENV !== 'production', // ⚠️ false en prod
+      logging: process.env.NODE_ENV === 'development',
     }),
 
-    // ✅ Modules applicatifs
+    // ==============================
+    // Modules métier
+    // ==============================
     AuthModule,
     UsersModule,
     FormationsModule,
+    InscriptionsModule,
     DevisModule,
     ChantiersModule,
-    PublicModule,
-    ChatModule,
-    InscriptionsModule,
-    CertificatesModule,
     NotificationsModule,
+    ChatModule,
+    CertificatesModule,
+    UploadModule,
+    PublicModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    // ==============================
+    // 🔒 Rate Limiting activé globalement
+    // ==============================
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

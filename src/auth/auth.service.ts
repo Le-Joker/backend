@@ -1,35 +1,28 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
-import { User, Role } from '../entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private usersRepository: Repository<User>,
     private jwtService: JwtService,
   ) {}
 
-  // ========================================
-  // INSCRIPTION
-  // ========================================
+  // ==============================
+  // REGISTER
+  // ==============================
   async register(registerDto: RegisterDto) {
-    const { email, password, nom, prenom, telephone, role } = registerDto;
+    const { email, password, firstName, lastName, role } = registerDto;
 
-    // Vérifier si l'email existe déjà
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-
+    // Vérifier si email existe déjà
+    const existingUser = await this.usersRepository.findOne({ where: { email } });
     if (existingUser) {
       throw new ConflictException('Cet email est déjà utilisé');
     }
@@ -38,99 +31,127 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Créer l'utilisateur
-    const user = this.userRepository.create({
+    const user = this.usersRepository.create({
       email,
       password: hashedPassword,
-      nom,
-      prenom,
-      telephone,
-      role: role || Role.ETUDIANT,
+      firstName,
+      lastName,
+      role: role || UserRole.ETUDIANT,
+      isActive: true,
     });
 
-    await this.userRepository.save(user);
+    await this.usersRepository.save(user);
 
-    // Générer le token JWT
-    const token = this.generateToken(user);
+    // Générer JWT
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const access_token = this.jwtService.sign(payload);
 
     return {
-      message: 'Inscription réussie',
-      user: this.sanitizeUser(user),
-      token,
+      access_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      },
     };
   }
 
-  // ========================================
-  // CONNEXION
-  // ========================================
+  // ==============================
+  // LOGIN
+  // ==============================
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
     // Trouver l'utilisateur
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
-
+    const user = await this.usersRepository.findOne({ where: { email } });
     if (!user) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
     // Vérifier le mot de passe
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
-    // Vérifier si le compte est actif
+    // Vérifier si compte actif
     if (!user.isActive) {
       throw new UnauthorizedException('Votre compte est désactivé');
     }
 
-    // Générer le token JWT
-    const token = this.generateToken(user);
+    // Générer JWT
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const access_token = this.jwtService.sign(payload);
 
     return {
-      message: 'Connexion réussie',
-      user: this.sanitizeUser(user),
-      token,
+      access_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        avatar: user.avatar,
+        testPassed: user.testPassed,
+        testScore: user.testScore,
+      },
     };
   }
 
-  // ========================================
-  // VALIDATION JWT (utilisé par JwtStrategy)
-  // ========================================
-  async validateUser(userId: string) {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Utilisateur non valide');
+  // ==============================
+  // 🆕 GOOGLE LOGIN
+  // ==============================
+  async googleLogin(googleUser: any) {
+    if (!googleUser) {
+      throw new UnauthorizedException('Erreur lors de l\'authentification Google');
     }
 
-    return user;
-  }
+    const { email, firstName, lastName, picture } = googleUser;
 
-  // ========================================
-  // HELPERS
-  // ========================================
-  private generateToken(user: User): string {
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
+    // Chercher ou créer l'utilisateur
+    let user = await this.usersRepository.findOne({ where: { email } });
+
+    if (!user) {
+      // Créer un nouvel utilisateur depuis Google
+      user = this.usersRepository.create({
+        email,
+        firstName,
+        lastName,
+        avatar: picture,
+        password: '', // Pas de mot de passe pour OAuth
+        role: UserRole.ETUDIANT, // Rôle par défaut
+        isActive: true,
+      });
+      await this.usersRepository.save(user);
+    }
+
+    // Générer JWT
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const access_token = this.jwtService.sign(payload);
+
+    return {
+      access_token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        avatar: user.avatar,
+      },
     };
-
-    return this.jwtService.sign(payload);
   }
 
-  // Méthode publique pour générer un token (utilisée par Google OAuth)
-  generateTokenForUser(user: User): string {
-    return this.generateToken(user);
-  }
-
-  private sanitizeUser(user: User) {
-    const { password, ...result } = user;
-    return result;
+  // ==============================
+  // VALIDATE USER (pour JWT Strategy)
+  // ==============================
+  async validateUser(userId: string) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException();
+    }
+    return user;
   }
 }
