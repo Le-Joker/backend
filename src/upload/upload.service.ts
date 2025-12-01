@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { File, FileType } from '../entities/file.entity';
@@ -30,24 +30,29 @@ export class UploadService {
     return this.fileRepository.save(fileEntity);
   }
 
+  // ✅ FIX : Ajouter la gestion du cas null
   async getFile(id: string): Promise<File> {
-    return this.fileRepository.findOne({ where: { id } });
+    const file = await this.fileRepository.findOne({ where: { id } });
+    
+    if (!file) {
+      throw new NotFoundException(`Fichier avec l'ID ${id} non trouvé`);
+    }
+    
+    return file;
   }
 
   async deleteFile(id: string): Promise<void> {
-    const file = await this.getFile(id);
+    const file = await this.getFile(id); // Utilise getFile qui gère déjà le cas null
     
-    if (file) {
-      // Supprimer le fichier physique
-      try {
-        await fs.unlink(file.filepath);
-      } catch (error) {
-        console.error('Erreur suppression fichier:', error);
-      }
-
-      // Supprimer de la base de données
-      await this.fileRepository.remove(file);
+    // Supprimer le fichier physique
+    try {
+      await fs.unlink(file.filepath);
+    } catch (error) {
+      console.error('Erreur suppression fichier physique:', error);
     }
+
+    // Supprimer de la base de données
+    await this.fileRepository.remove(file);
   }
 
   private getFileType(mimetype: string): FileType {
