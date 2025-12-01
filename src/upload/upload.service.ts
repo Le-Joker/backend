@@ -30,7 +30,6 @@ export class UploadService {
     return this.fileRepository.save(fileEntity);
   }
 
-  // ✅ FIX : Ajouter la gestion du cas null
   async getFile(id: string): Promise<File> {
     const file = await this.fileRepository.findOne({ where: { id } });
     
@@ -41,8 +40,18 @@ export class UploadService {
     return file;
   }
 
+  async findAll(userId?: string): Promise<File[]> {
+    const query = this.fileRepository.createQueryBuilder('file');
+
+    if (userId) {
+      query.where('file.uploadedById = :userId', { userId });
+    }
+
+    return query.orderBy('file.createdAt', 'DESC').getMany();
+  }
+
   async deleteFile(id: string): Promise<void> {
-    const file = await this.getFile(id); // Utilise getFile qui gère déjà le cas null
+    const file = await this.getFile(id);
     
     // Supprimer le fichier physique
     try {
@@ -51,7 +60,6 @@ export class UploadService {
       console.error('Erreur suppression fichier physique:', error);
     }
 
-    // Supprimer de la base de données
     await this.fileRepository.remove(file);
   }
 

@@ -1,9 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Activer la validation globale
   app.useGlobalPipes(
@@ -14,22 +16,23 @@ async function bootstrap() {
     }),
   );
 
-  // Activer CORS pour permettre les requêtes du frontend
+  // IMPORTANT : Servir les fichiers statiques uploadés
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  });
+
+  // Activer CORS
   app.enableCors({
-    origin: 'http://localhost:3000', // Frontend Next.js
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
   });
 
-  // Préfixe global pour toutes les routes
   app.setGlobalPrefix('api');
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
   console.log(`\n🚀 Serveur démarré sur http://localhost:${port}/api`);
-  console.log(`📚 Routes disponibles :`);
-  console.log(`   - POST http://localhost:${port}/api/auth/register`);
-  console.log(`   - POST http://localhost:${port}/api/auth/login`);
-  console.log(`   - GET  http://localhost:${port}/api/auth/me\n`);
+  console.log(`📁 Fichiers uploads : http://localhost:${port}/uploads\n`);
 }
 bootstrap();
