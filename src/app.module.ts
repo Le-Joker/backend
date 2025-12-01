@@ -28,6 +28,8 @@ import { ChantiersModule } from './chantiers/chantiers.module'; // ✅ CRÉÉ
 import { PublicModule } from './public/public.module';
 import { ChatModule } from './chat/chat.module';
 import { InscriptionsModule } from './inscriptions/inscriptions.module';
+import { CertificatesModule } from './certificates/certificates.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -71,6 +73,8 @@ import { InscriptionsModule } from './inscriptions/inscriptions.module';
     PublicModule,
     ChatModule,
     InscriptionsModule,
+    CertificatesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
